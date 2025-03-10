@@ -26,13 +26,7 @@ public class CartController {
             @RequestParam int quantity) {
 
         String result = cartService.addToCart(userEmail, productId, quantity);
-        if ("Item already in cart".equals(result)) {
-            return ResponseEntity.status(200).body(result);
-        } else if ("Product not found".equals(result)) {
-            return ResponseEntity.status(404).body(result);
-        } else {
-            return ResponseEntity.status(201).body(result); // 201 for created
-        }
+        return ResponseEntity.ok(result);
     }
 
 

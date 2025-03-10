@@ -7,6 +7,7 @@ import "react-loading-skeleton/dist/skeleton.css";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAuth0 } from "@auth0/auth0-react";
+import { Toast } from "bootstrap";
 
 const Products = () => {
   const [data, setData] = useState([]);
@@ -25,18 +26,7 @@ const Products = () => {
           quantity: 1,
         },
       });
-
-      console.log("Response:", response);
-
-      if (response.status === 201) {
-        toast.success("Added to cart!");
-      } else if (response.data === "Item already in cart") {
-        toast.error("Item already in cart!");
-      } else if (response.data === "Product not found") {
-        toast.error("Product not found!");
-      } else {
-        toast.error("Unexpected response!");
-      }
+      toast.success(response.data);
     } catch (error) {
       console.error("Error:", error.response ? error.response.data : error.message);
     }
@@ -136,7 +126,6 @@ const Products = () => {
                           toast.error("Please log in to add items to the cart.");
                           return;
                         }
-                        toast.success("Added to cart");
                         addProduct(product);
                       }}
                     >
