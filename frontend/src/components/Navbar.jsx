@@ -1,34 +1,36 @@
-import React, { useState,useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
 import toast from "react-hot-toast";
 import axios from 'axios';
 
 const Navbar = () => {
-    
     const { loginWithRedirect, logout, user, isAuthenticated } = useAuth0();
     const [showDropdown, setShowDropdown] = useState(false);
-    const navigate = useNavigate();  
-
+    const navigate = useNavigate();
     const [cartCount, setCartCount] = useState(0);
+    useEffect(() => {
+        const fetchCartCount = async () => {
+            if (user?.email) {  // ✅ Safe check
+                try {
+                    const response = await axios.get(`http://localhost:8080/cart/noofproduct/${user.email}`);
+                    console.log("Cart count response:", response.data); // Debugging log
+                    setCartCount(response.data); // ✅ Properly update state
+                } catch (error) {
+                    console.error("Error fetching cart data:", error);
+                }
+            }
+        };
 
-    // useEffect(() => {
-    //     if (user.email) {
-    //         axios.get(`http://localhost:8080/cart/noofproduct/${user.email}`)
-    //             .then(response => {
-    //                 setCartCount(response.data.length);
-    //             })
-    //             .catch(error => {
-    //                 console.error("Error fetching cart data:", error);
-    //             });
-    //     }
-    // }, [user.email]);
+        fetchCartCount(); // Call the async function
+    }, [user]);  // ✅ Runs when 'user' changes
+
 
     const handleCartClick = () => {
         if (!isAuthenticated) {
-            toast("Please login to access the cart.");
+            toast.error("Please log in to add items to the cart.");
         } else {
-            navigate('/cart');  
+            navigate('/cart');
         }
     };
 
@@ -42,18 +44,10 @@ const Navbar = () => {
 
                 <div className="collapse navbar-collapse" id="navbarSupportedContent">
                     <ul className="navbar-nav m-auto my-2 text-center">
-                        <li className="nav-item">
-                            <NavLink className="nav-link" to="/">Home</NavLink>
-                        </li>
-                        <li className="nav-item">
-                            <NavLink className="nav-link" to="/product">Products</NavLink>
-                        </li>
-                        <li className="nav-item">
-                            <NavLink className="nav-link" to="/about">About</NavLink>
-                        </li>
-                        <li className="nav-item">
-                            <NavLink className="nav-link" to="/contact">Contact</NavLink>
-                        </li>
+                        <li className="nav-item"><NavLink className="nav-link" to="/">Home</NavLink></li>
+                        <li className="nav-item"><NavLink className="nav-link" to="/product">Products</NavLink></li>
+                        <li className="nav-item"><NavLink className="nav-link" to="/about">About</NavLink></li>
+                        <li className="nav-item"><NavLink className="nav-link" to="/contact">Contact</NavLink></li>
                     </ul>
 
                     <div className="buttons text-center d-flex align-items-center">
@@ -70,7 +64,6 @@ const Navbar = () => {
                                     style={{ width: "40px", height: "40px", cursor: "pointer" }}
                                     onClick={() => setShowDropdown(!showDropdown)}
                                 />
-
                                 {showDropdown && (
                                     <div className="position-absolute bg-white shadow rounded p-3" style={{ right: 0, top: "50px", width: "200px", zIndex: 1000 }}>
                                         <p className="mb-1"><strong>{user.name}</strong></p>

@@ -7,6 +7,7 @@ import { addCart } from "../redux/action";
 import { useAuth0 } from "@auth0/auth0-react";
 import { toast } from "react-hot-toast";
 import { Footer, Navbar } from "../components";
+import axios from "axios";
 
 const Product = () => {
   const { id } = useParams();
@@ -17,10 +18,21 @@ const Product = () => {
 
   const dispatch = useDispatch();
 
-  const { isAuthenticated } = useAuth0();
+  const { user,isAuthenticated } = useAuth0();
 
-  const addProduct = (product) => {
-    dispatch(addCart(product));
+  const addProduct = async (product) => {
+    try {
+      const response = await axios.post("http://localhost:8080/cart/add", null, {
+        params: {
+          userEmail: user.email,
+          productId: product.id,
+          quantity: 1,
+        },
+      });
+      toast.success(response.data);
+    } catch (error) {
+      console.error("Error:", error.response ? error.response.data : error.message);
+    }
   };
 
   useEffect(() => {
