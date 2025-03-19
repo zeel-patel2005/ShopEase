@@ -1,9 +1,44 @@
-import React from "react";
-import { Footer, Navbar } from "../components";
-import { useSelector } from "react-redux";
-import { Link } from "react-router-dom";
+"use client"
+
+import { useState, useEffect } from "react"
+import { Footer, Navbar } from "../components"
+import { useSelector } from "react-redux"
+import { Link } from "react-router-dom"
+
 const Checkout = () => {
-  const state = useSelector((state) => state.handleCart);
+  const state = useSelector((state) => state.handleCart)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [paymentSuccess, setPaymentSuccess] = useState(false)
+  const [scriptLoaded, setScriptLoaded] = useState(false)
+
+  // Load Razorpay script
+  useEffect(() => {
+    const loadRazorpayScript = () => {
+      const script = document.createElement("script")
+      script.src = "https://checkout.razorpay.com/v1/checkout.js"
+      script.async = true
+      script.onload = () => {
+        setScriptLoaded(true)
+        console.log("Razorpay script loaded successfully")
+      }
+      script.onerror = () => {
+        console.error("Failed to load Razorpay script")
+        setError("Failed to load payment gateway. Please try again later.")
+      }
+      document.body.appendChild(script)
+    }
+
+    if (!window.Razorpay) {
+      loadRazorpayScript()
+    } else {
+      setScriptLoaded(true)
+    }
+
+    return () => {
+      // Cleanup if needed
+    }
+  }, [])
 
   const EmptyCart = () => {
     return (
@@ -17,23 +52,178 @@ const Checkout = () => {
           </div>
         </div>
       </div>
-    );
-  };
+    )
+  }
 
   const ShowCheckout = () => {
-    let subtotal = 0;
-    let shipping = 30.0;
-    let totalItems = 0;
-    state.map((item) => {
-      return (subtotal += item.price * item.qty);
-    });
+    let subtotal = 0
+    const shipping = 30.0
+    let totalItems = 0
 
     state.map((item) => {
-      return (totalItems += item.qty);
-    });
+      return (subtotal += item.price * item.qty)
+    })
+
+    state.map((item) => {
+      return (totalItems += item.qty)
+    })
+
+    // Verify payment with the server
+    const verifyPayment = async (response) => {
+      try {
+        const verificationData = {
+          razorpayOrderId: response.razorpay_order_id,
+          razorpayPaymentId: response.razorpay_payment_id,
+          razorpaySignature: response.razorpay_signature,
+        }
+
+        const verificationResponse = await fetch("http://localhost:8080/api/verify-payment", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(verificationData),
+        })
+
+        const verificationResult = await verificationResponse.json()
+
+        if (verificationResult.status === "success") {
+          setPaymentSuccess(true)
+          // Here you would typically redirect to a success page or clear the cart
+        } else {
+          setError("Payment verification failed. Please try again.")
+        }
+      } catch (err) {
+        console.error("Error verifying payment:", err)
+        setError("Error verifying payment. Please contact support.")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    // Handling Razorpay Payment
+    const handlePayment = async () => {
+      if (!scriptLoaded) {
+        setError("Payment gateway is still loading. Please try again in a moment.")
+        return
+      }
+
+      try {
+        setLoading(true)
+        setError(null)
+
+        // Call the server to create a Razorpay order
+        const response = await fetch("http://localhost:8080/api/create-razorpay-order", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            amount: Math.round(subtotal + shipping),
+            currency: "INR",
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error("Failed to create order")
+        }
+
+        const data = await response.json()
+        const orderData = JSON.parse(data.orderData)
+
+        // Get Razorpay key from environment or use fallback
+        const razorpayKeyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_YOUR_TEST_KEY"
+
+        // Initialize Razorpay
+        const options = {
+          key: razorpayKeyId,
+          amount: orderData.amount,
+          currency: orderData.currency,
+          name: "Your Store Name",
+          description: "Order Payment",
+          image: "https://your-store-logo-url", // Your logo URL here
+          order_id: orderData.id,
+          handler: (response) => {
+            verifyPayment(response)
+          },
+          prefill: {
+            name: "John Doe", // Add dynamic values for the user here
+            email: "johndoe@example.com",
+            contact: "+919876543210",
+          },
+          notes: {
+            address: "Razorpay Address",
+            is_test: "true",
+          },
+          theme: {
+            color: "#F37254",
+          },
+          // Enable this for test mode
+          modal: {
+            ondismiss: () => {
+              setLoading(false)
+              console.log("Payment modal closed")
+            },
+          },
+          // For testing failed payments
+          config: {
+            display: {
+              blocks: {
+                utib: {
+                  // Axis Bank Test Cards
+                  name: "Test Payment Methods",
+                  instruments: [
+                    {
+                      method: "card",
+                      issuers: ["UTIB"],
+                    },
+                  ],
+                },
+              },
+              sequence: ["block.utib"],
+              preferences: {
+                show_default_blocks: false,
+              },
+            },
+          },
+        }
+
+        const razorpay = new window.Razorpay(options)
+
+        // For testing, you can use these test card details:
+        // Card Number: 4111 1111 1111 1111
+        // Expiry: Any future date
+        // CVV: Any 3 digits
+        // Name: Any name
+
+        razorpay.on("payment.failed", (response) => {
+          setLoading(false)
+          setError(`Payment failed: ${response.error.description}`)
+        })
+
+        razorpay.open()
+      } catch (error) {
+        console.error("Error creating Razorpay order:", error)
+        setError("Failed to initialize payment. Please try again.")
+        setLoading(false)
+      }
+    }
+
     return (
       <>
         <div className="container py-5">
+          {paymentSuccess && (
+            <div className="alert alert-success" role="alert">
+              Payment successful! Thank you for your order.
+            </div>
+          )}
+
+          {error && (
+            <div className="alert alert-danger" role="alert">
+              {error}
+            </div>
+          )}
+
           <div className="row my-4">
             <div className="col-md-5 col-lg-4 order-md-last">
               <div className="card mb-4">
@@ -67,211 +257,31 @@ const Checkout = () => {
                   <h4 className="mb-0">Billing address</h4>
                 </div>
                 <div className="card-body">
-                  <form className="needs-validation" novalidate>
-                    <div className="row g-3">
-                      <div className="col-sm-6 my-1">
-                        <label for="firstName" className="form-label">
-                          First name
-                        </label>
-                        <input
-                          type="text"
-                          className="form-control"
-                          id="firstName"
-                          placeholder=""
-                          required
-                        />
-                        <div className="invalid-feedback">
-                          Valid first name is required.
-                        </div>
-                      </div>
-
-                      <div className="col-sm-6 my-1">
-                        <label for="lastName" className="form-label">
-                          Last name
-                        </label>
-                        <input
-                          type="text"
-                          className="form-control"
-                          id="lastName"
-                          placeholder=""
-                          required
-                        />
-                        <div className="invalid-feedback">
-                          Valid last name is required.
-                        </div>
-                      </div>
-
-                      <div className="col-12 my-1">
-                        <label for="email" className="form-label">
-                          Email
-                        </label>
-                        <input
-                          type="email"
-                          className="form-control"
-                          id="email"
-                          placeholder="you@example.com"
-                          required
-                        />
-                        <div className="invalid-feedback">
-                          Please enter a valid email address for shipping
-                          updates.
-                        </div>
-                      </div>
-
-                      <div className="col-12 my-1">
-                        <label for="address" className="form-label">
-                          Address
-                        </label>
-                        <input
-                          type="text"
-                          className="form-control"
-                          id="address"
-                          placeholder="1234 Main St"
-                          required
-                        />
-                        <div className="invalid-feedback">
-                          Please enter your shipping address.
-                        </div>
-                      </div>
-
-                      <div className="col-12">
-                        <label for="address2" className="form-label">
-                          Address 2{" "}
-                          <span className="text-muted">(Optional)</span>
-                        </label>
-                        <input
-                          type="text"
-                          className="form-control"
-                          id="address2"
-                          placeholder="Apartment or suite"
-                        />
-                      </div>
-
-                      <div className="col-md-5 my-1">
-                        <label for="country" className="form-label">
-                          Country
-                        </label>
-                        <br />
-                        <select className="form-select" id="country" required>
-                          <option value="">Choose...</option>
-                          <option>India</option>
-                        </select>
-                        <div className="invalid-feedback">
-                          Please select a valid country.
-                        </div>
-                      </div>
-
-                      <div className="col-md-4 my-1">
-                        <label for="state" className="form-label">
-                          State
-                        </label>
-                        <br />
-                        <select className="form-select" id="state" required>
-                          <option value="">Choose...</option>
-                          <option>Punjab</option>
-                        </select>
-                        <div className="invalid-feedback">
-                          Please provide a valid state.
-                        </div>
-                      </div>
-
-                      <div className="col-md-3 my-1">
-                        <label for="zip" className="form-label">
-                          Zip
-                        </label>
-                        <input
-                          type="text"
-                          className="form-control"
-                          id="zip"
-                          placeholder=""
-                          required
-                        />
-                        <div className="invalid-feedback">
-                          Zip code required.
-                        </div>
-                      </div>
-                    </div>
-
+                  <form className="needs-validation" noValidate>
+                    {/* Your billing address fields here */}
                     <hr className="my-4" />
-
                     <h4 className="mb-3">Payment</h4>
 
-                    <div className="row gy-3">
-                      <div className="col-md-6">
-                        <label for="cc-name" className="form-label">
-                          Name on card
-                        </label>
-                        <input
-                          type="text"
-                          className="form-control"
-                          id="cc-name"
-                          placeholder=""
-                          required
-                        />
-                        <small className="text-muted">
-                          Full name as displayed on card
-                        </small>
-                        <div className="invalid-feedback">
-                          Name on card is required
-                        </div>
-                      </div>
-
-                      <div className="col-md-6">
-                        <label for="cc-number" className="form-label">
-                          Credit card number
-                        </label>
-                        <input
-                          type="text"
-                          className="form-control"
-                          id="cc-number"
-                          placeholder=""
-                          required
-                        />
-                        <div className="invalid-feedback">
-                          Credit card number is required
-                        </div>
-                      </div>
-
-                      <div className="col-md-3">
-                        <label for="cc-expiration" className="form-label">
-                          Expiration
-                        </label>
-                        <input
-                          type="text"
-                          className="form-control"
-                          id="cc-expiration"
-                          placeholder=""
-                          required
-                        />
-                        <div className="invalid-feedback">
-                          Expiration date required
-                        </div>
-                      </div>
-
-                      <div className="col-md-3">
-                        <label for="cc-cvv" className="form-label">
-                          CVV
-                        </label>
-                        <input
-                          type="text"
-                          className="form-control"
-                          id="cc-cvv"
-                          placeholder=""
-                          required
-                        />
-                        <div className="invalid-feedback">
-                          Security code required
-                        </div>
-                      </div>
-                    </div>
-
-                    <hr className="my-4" />
-
                     <button
-                      className="w-100 btn btn-primary "
-                      type="submit" disabled
+                      className="w-100 btn btn-primary"
+                      type="button"
+                      onClick={handlePayment}
+                      disabled={loading || !scriptLoaded}
                     >
-                      Continue to checkout
+                      {loading ? (
+                        <>
+                          <span
+                            className="spinner-border spinner-border-sm me-2"
+                            role="status"
+                            aria-hidden="true"
+                          ></span>
+                          Processing...
+                        </>
+                      ) : !scriptLoaded ? (
+                        "Loading payment gateway..."
+                      ) : (
+                        "Continue to checkout"
+                      )}
                     </button>
                   </form>
                 </div>
@@ -280,8 +290,9 @@ const Checkout = () => {
           </div>
         </div>
       </>
-    );
-  };
+    )
+  }
+
   return (
     <>
       <Navbar />
@@ -292,7 +303,8 @@ const Checkout = () => {
       </div>
       <Footer />
     </>
-  );
-};
+  )
+}
 
-export default Checkout;
+export default Checkout
+

@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@auth0/auth0-react": "^2.3.0",
+    "@popperjs/core": "^2.11.8",
     "@reduxjs/toolkit": "^2.6.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
@@ -47,5 +48,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
   }
 }
