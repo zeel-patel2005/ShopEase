@@ -30,12 +30,44 @@ const Cart = () => {
   }, [user.email, isAuthenticated]); // Include isAuthenticated in dependencies
 
 
-  const addItem = (product) => {
-    dispatch(addCart(product));
+  const addItem = async (item) => {
+    try {
+      const response = await axios.post("http://localhost:8080/product/plus", {
+        email: user.email,
+        productId: item.product.id, // Send product ID
+      });
+
+      if (response.status === 200) {
+        setCartData((prevCart) =>
+          prevCart.map((cartItem) =>
+            cartItem.id === item.id ? { ...cartItem, quantity: cartItem.quantity + 1 } : cartItem
+          )
+        );
+      }
+    } catch (error) {
+      console.error("Error adding item to cart:", error);
+    }
   };
 
-  const removeItem = (product) => {
-    dispatch(delCart(product));
+  const removeItem = async (item) => {
+    try {
+      const response = await axios.post("http://localhost:8080/product/remove", {
+        email: user.email,
+        productId: item.product.id,
+      });
+
+      if (response.status === 200) {
+        setCartData((prevCart) =>
+          prevCart
+            .map((cartItem) =>
+              cartItem.id === item.id ? { ...cartItem, quantity: cartItem.quantity - 1 } : cartItem
+            )
+            .filter((cartItem) => cartItem.quantity > 0) // Remove item if quantity reaches 0
+        );
+      }
+    } catch (error) {
+      console.error("Error removing item from cart:", error);
+    }
   };
 
   const EmptyCart = () => (
@@ -52,9 +84,9 @@ const Cart = () => {
   );
 
   const ShowCart = () => {
-    let subtotal = cartData.reduce((sum, item) => sum + item.price * item.qty, 0);
+    let subtotal = cartData.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
     let shipping = 30.0;
-    let totalItems = cartData.reduce((sum, item) => sum + item.qty, 0);
+    let totalItems = cartData.reduce((sum, item) => sum + item.quantity, 0);
 
     return (
       <section className="h-100 gradient-custom">
@@ -70,23 +102,23 @@ const Cart = () => {
                     <div key={item.id}>
                       <div className="row d-flex align-items-center">
                         <div className="col-lg-3 col-md-12">
-                          <img src={item.image} alt={item.title} width={100} height={75} />
+                          <img src={item.product.image} alt={item.product.title} width={100} height={75} />
                         </div>
                         <div className="col-lg-5 col-md-6">
-                          <p><strong>{item.title}</strong></p>
+                          <p><strong>{item.product.title}</strong></p>
                         </div>
                         <div className="col-lg-4 col-md-6">
                           <div className="d-flex mb-4" style={{ maxWidth: "300px" }}>
                             <button className="btn px-3" onClick={() => removeItem(item)}>
                               <i className="fas fa-minus"></i>
                             </button>
-                            <p className="mx-5">{item.qty}</p>
+                            <p className="mx-5">{item.quantity}</p>
                             <button className="btn px-3" onClick={() => addItem(item)}>
                               <i className="fas fa-plus"></i>
                             </button>
                           </div>
                           <p className="text-start text-md-center">
-                            <strong>{item.qty} x ${item.price}</strong>
+                            <strong>{item.quantity} x {'\u20B9'}{item.product.price}</strong>
                           </p>
                         </div>
                       </div>
@@ -104,14 +136,14 @@ const Cart = () => {
                 <div className="card-body">
                   <ul className="list-group list-group-flush">
                     <li className="list-group-item d-flex justify-content-between align-items-center border-0 px-0 pb-0">
-                      Products ({totalItems}) <span>${Math.round(subtotal)}</span>
+                      Products ({totalItems}) <span>{'\u20B9'}{Math.round(subtotal)}</span>
                     </li>
                     <li className="list-group-item d-flex justify-content-between align-items-center px-0">
-                      Shipping <span>${shipping}</span>
+                      Shipping <span>{'\u20B9'}{shipping}</span>
                     </li>
                     <li className="list-group-item d-flex justify-content-between align-items-center border-0 px-0 mb-3">
                       <div><strong>Total amount</strong></div>
-                      <span><strong>${Math.round(subtotal + shipping)}</strong></span>
+                      <span><strong>{'\u20B9'}{Math.round(subtotal + shipping)}</strong></span>
                     </li>
                   </ul>
                   <Link to="/checkout" className="btn btn-dark btn-lg btn-block">
@@ -125,6 +157,7 @@ const Cart = () => {
       </section>
     );
   };
+
 
   return (
     <>

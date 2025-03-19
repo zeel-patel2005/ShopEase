@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import { Footer, Navbar } from "../components"
 import { useSelector } from "react-redux"
 import { Link } from "react-router-dom"
+import { useAuth0 } from "@auth0/auth0-react";
+import axios from "axios"
 
 const Checkout = () => {
   const state = useSelector((state) => state.handleCart)
@@ -11,6 +13,26 @@ const Checkout = () => {
   const [error, setError] = useState(null)
   const [paymentSuccess, setPaymentSuccess] = useState(false)
   const [scriptLoaded, setScriptLoaded] = useState(false)
+  const [cartData, setCartData] = useState([]);
+  const { user, isAuthenticated } = useAuth0();
+
+  useEffect(() => {
+    const fetchCartItems = async () => {
+      if (user.email && isAuthenticated) {
+        try {
+          const response = await axios.get(`http://localhost:8080/cart/allcartitem`, {
+            params: { email: user.email }, // Query parameter
+          });
+          setCartData(response.data);
+          console.log(response.data);
+        } catch (error) {
+          console.error("Error fetching cart:", error);
+        }
+      }
+    };
+
+    fetchCartItems();
+  }, [user.email, isAuthenticated]); // Include isAuthenticated in dependencies
 
   // Load Razorpay script
   useEffect(() => {
@@ -56,17 +78,9 @@ const Checkout = () => {
   }
 
   const ShowCheckout = () => {
-    let subtotal = 0
-    const shipping = 30.0
-    let totalItems = 0
-
-    state.map((item) => {
-      return (subtotal += item.price * item.qty)
-    })
-
-    state.map((item) => {
-      return (totalItems += item.qty)
-    })
+    let subtotal = cartData.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+    let shipping = 30.0;
+    let totalItems = cartData.reduce((sum, item) => sum + item.quantity, 0);
 
     // Verify payment with the server
     const verifyPayment = async (response) => {
@@ -77,7 +91,7 @@ const Checkout = () => {
           razorpaySignature: response.razorpay_signature,
         }
 
-        const verificationResponse = await fetch("http://localhost:8080/api/verify-payment", {
+        const verificationResponse = await axios.post("http://localhost:8080/api/verify-payment", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -113,7 +127,7 @@ const Checkout = () => {
         setError(null)
 
         // Call the server to create a Razorpay order
-        const response = await fetch("http://localhost:8080/api/create-razorpay-order", {
+        const response = await axios.post("http://localhost:8080/api/create-razorpay-order", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -233,18 +247,18 @@ const Checkout = () => {
                 <div className="card-body">
                   <ul className="list-group list-group-flush">
                     <li className="list-group-item d-flex justify-content-between align-items-center border-0 px-0 pb-0">
-                      Products ({totalItems})<span>${Math.round(subtotal)}</span>
+                      Products ({totalItems})<span>{'\u20B9'}{Math.round(subtotal)}</span>
                     </li>
                     <li className="list-group-item d-flex justify-content-between align-items-center px-0">
                       Shipping
-                      <span>${shipping}</span>
+                      <span>{'\u20B9'}{shipping}</span>
                     </li>
                     <li className="list-group-item d-flex justify-content-between align-items-center border-0 px-0 mb-3">
                       <div>
                         <strong>Total amount</strong>
                       </div>
                       <span>
-                        <strong>${Math.round(subtotal + shipping)}</strong>
+                        <strong>{'\u20B9'}{Math.round(subtotal + shipping)}</strong>
                       </span>
                     </li>
                   </ul>

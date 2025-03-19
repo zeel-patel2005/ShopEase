@@ -68,5 +68,4 @@ public class CartItem {
                 ", quantity=" + quantity +
                 '}';
     }
-
 }

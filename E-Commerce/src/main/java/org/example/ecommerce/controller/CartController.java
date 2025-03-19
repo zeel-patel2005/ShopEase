@@ -12,7 +12,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/cart")
-@CrossOrigin
+@CrossOrigin(origins = "http://localhost:3000")
 public class CartController {
     @Autowired
     private CartService cartService;
@@ -24,6 +24,8 @@ public class CartController {
             @RequestParam String userEmail,
             @RequestParam Long productId,
             @RequestParam int quantity) {
+
+//        System.out.println(userEmail + " " + productId + " " + quantity);
 
         String result = cartService.addToCart(userEmail, productId, quantity);
         return ResponseEntity.ok(result);
@@ -41,10 +43,9 @@ public class CartController {
     @GetMapping("/allcartitem")
     public ResponseEntity<List<CartItem>> getCartByEmail(@RequestParam String email) {
         List<CartItem> cartItems = cartService.getCartItemsByEmail(email);
-        for(CartItem cartItem : cartItems) {
-            System.out.println(cartItem);
-        }
         return ResponseEntity.ok(cartItems);
     }
+
+
 
 }
