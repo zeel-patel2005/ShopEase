@@ -62,9 +62,13 @@ public class CartService {
         return result;
     }
 
-
-
     public Long getCartByUserId(Long id) {
         return cartRepository.countProductsInCart(id);
+    }
+
+    public List<CartItem> getCartItemsByEmail(String email) {
+        Long cartid = cartRepository.findCartIdByEmail(email);
+        List<CartItem> cartItems = cartRepository.findByCartId(cartid);
+        return cartItems;
     }
 }

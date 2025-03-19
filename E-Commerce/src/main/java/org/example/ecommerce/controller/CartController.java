@@ -38,4 +38,13 @@ public class CartController {
         return ResponseEntity.ok(cartItems);
     }
 
+    @GetMapping("/allcartitem")
+    public ResponseEntity<List<CartItem>> getCartByEmail(@RequestParam String email) {
+        List<CartItem> cartItems = cartService.getCartItemsByEmail(email);
+        for(CartItem cartItem : cartItems) {
+            System.out.println(cartItem);
+        }
+        return ResponseEntity.ok(cartItems);
+    }
+
 }

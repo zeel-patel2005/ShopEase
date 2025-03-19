@@ -1,10 +1,8 @@
 package org.example.ecommerce.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 @Entity
 @Table(name = "cart_items")
@@ -19,10 +17,23 @@ public class CartItem {
     private Long id;
 
     @ManyToOne
+    @JoinColumn(name = "cart_id", nullable = false)
+    @JsonBackReference
+    private Cart cart; // Added reference to Cart
+
+    @ManyToOne
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
     private Integer quantity;
+
+    public Cart getCart() {
+        return cart;
+    }
+
+    public void setCart(Cart cart) {
+        this.cart = cart;
+    }
 
     public Long getId() {
         return id;
@@ -47,4 +58,15 @@ public class CartItem {
     public void setQuantity(Integer quantity) {
         this.quantity = quantity;
     }
+
+    @Override
+    public String toString() {
+        return "CartItem{" +
+                "id=" + id +
+                ", cart=" + cart +
+                ", product=" + product +
+                ", quantity=" + quantity +
+                '}';
+    }
+
 }

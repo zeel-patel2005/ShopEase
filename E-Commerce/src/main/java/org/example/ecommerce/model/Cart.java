@@ -1,5 +1,6 @@
 package org.example.ecommerce.model;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDate;
@@ -23,6 +24,7 @@ public class Cart {
 
     @OneToMany(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JoinColumn(name = "cart_id")
+    @JsonManagedReference
     private List<CartItem> products;
 
     public Long getId() {
@@ -56,4 +58,5 @@ public class Cart {
     public void setProducts(List<CartItem> products) {
         this.products = products;
     }
+
 }
