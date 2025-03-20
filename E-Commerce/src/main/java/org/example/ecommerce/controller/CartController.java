@@ -25,8 +25,6 @@ public class CartController {
             @RequestParam Long productId,
             @RequestParam int quantity) {
 
-//        System.out.println(userEmail + " " + productId + " " + quantity);
-
         String result = cartService.addToCart(userEmail, productId, quantity);
         return ResponseEntity.ok(result);
     }
@@ -46,6 +44,10 @@ public class CartController {
         return ResponseEntity.ok(cartItems);
     }
 
-
+    @DeleteMapping("/clearcart")
+    public ResponseEntity<String> clearCart(@RequestParam String email) {
+        String result = cartService.clearCart(email);
+        return ResponseEntity.ok(result);
+    }
 
 }

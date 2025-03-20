@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import org.example.ecommerce.repository.CartItemRepo;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.example.ecommerce.repository.CartRepository;
@@ -21,6 +22,8 @@ public class CartService {
 
     @Autowired
     private ProductRepository productRepository;
+    @Autowired
+    private CartItemRepo cartItemRepo;
 
 
     public String addToCart(String userEmail, Long productId, int quantity) {
@@ -71,4 +74,26 @@ public class CartService {
         List<CartItem> cartItems = cartRepository.findByCartId(cartid);
         return cartItems;
     }
+
+    public String clearCart(String userEmail) {
+        Optional<Cart> cartOptional = cartRepository.findByUserId(userEmail);
+
+        if (cartOptional.isPresent()) {
+            Cart cart = cartOptional.get();
+
+            // Delete all cart items from the database
+            cartItemRepo.deleteAll(cart.getProducts());
+
+            // Clear cart products list
+            cart.getProducts().clear();
+
+            // Save the empty cart
+            cartRepository.save(cart);
+
+            return "Cart cleared successfully";
+        }
+
+        return "Cart not found";
+    }
+
 }
