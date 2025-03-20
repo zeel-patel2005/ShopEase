@@ -101,7 +101,7 @@ const Products = () => {
                     </p>
                   </div>
                   <ul className="list-group list-group-flush">
-                    <li className="list-group-item lead">$ {product.price || "N/A"}</li>
+                    <li className="list-group-item lead">{'\u20B9'} {product.price || "N/A"}</li>
                   </ul>
                   <div className="card-body">
                     {/* Buy Now Button - Prevents Unauthorized Access */}

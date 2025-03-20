@@ -2,323 +2,252 @@
 
 import { useState, useEffect } from "react"
 import { Footer, Navbar } from "../components"
-import { useSelector } from "react-redux"
-import { Link } from "react-router-dom"
-import { useAuth0 } from "@auth0/auth0-react";
+import { useSelector, useDispatch } from "react-redux"
+import { useLocation, Link } from "react-router-dom"
+import { useAuth0 } from "@auth0/auth0-react"
 import axios from "axios"
 
 const Checkout = () => {
   const state = useSelector((state) => state.handleCart)
+  const dispatch = useDispatch()
+  const location = useLocation()
+  const { user, isAuthenticated } = useAuth0()
+  const [cartData, setCartData] = useState(location.state?.cartItems || [])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [paymentSuccess, setPaymentSuccess] = useState(false)
   const [scriptLoaded, setScriptLoaded] = useState(false)
-  const [cartData, setCartData] = useState([]);
-  const { user, isAuthenticated } = useAuth0();
+  const [paymentSuccess, setPaymentSuccess] = useState(false)
 
   useEffect(() => {
-    const fetchCartItems = async () => {
-      if (user.email && isAuthenticated) {
+    if (state.length > 0) {
+      setCartData(state)
+    } else if (cartData.length === 0 && user?.email && isAuthenticated) {
+      const fetchCartItems = async () => {
         try {
-          const response = await axios.get(`http://localhost:8080/cart/allcartitem`, {
-            params: { email: user.email }, // Query parameter
-          });
-          setCartData(response.data);
-          console.log(response.data);
+          const response = await axios.get("http://localhost:8080/cart/allcartitem", {
+            params: { email: user.email },
+          })
+          setCartData(response.data)
         } catch (error) {
-          console.error("Error fetching cart:", error);
+          console.error("Error fetching cart:", error)
         }
       }
-    };
+      fetchCartItems()
+    }
+  }, [state, user, isAuthenticated])
 
-    fetchCartItems();
-  }, [user.email, isAuthenticated]); // Include isAuthenticated in dependencies
-
-  // Load Razorpay script
   useEffect(() => {
-    const loadRazorpayScript = () => {
-      const script = document.createElement("script")
-      script.src = "https://checkout.razorpay.com/v1/checkout.js"
-      script.async = true
-      script.onload = () => {
-        setScriptLoaded(true)
-        console.log("Razorpay script loaded successfully")
-      }
-      script.onerror = () => {
-        console.error("Failed to load Razorpay script")
-        setError("Failed to load payment gateway. Please try again later.")
-      }
-      document.body.appendChild(script)
-    }
-
-    if (!window.Razorpay) {
-      loadRazorpayScript()
-    } else {
-      setScriptLoaded(true)
-    }
-
-    return () => {
-      // Cleanup if needed
-    }
+    const script = document.createElement("script")
+    script.src = "https://checkout.razorpay.com/v1/checkout.js"
+    script.async = true
+    script.onload = () => setScriptLoaded(true)
+    document.body.appendChild(script)
   }, [])
 
-  const EmptyCart = () => {
+  // Function to clear cart items
+  const clearCart = async () => {
+    try {
+      if (user?.email && isAuthenticated) {
+        // Clear cart in the database
+        await axios.delete("http://localhost:8080/cart/clearcart", {
+          params: { email: user.email },
+        })
+      }
+
+      // Clear cart in Redux store
+      if (dispatch) {
+        // Assuming you have an action to clear the cart
+        dispatch({ type: "CLEAR_CART" })
+      }
+
+      // Clear local state
+      setCartData([])
+    } catch (error) {
+      console.error("Error clearing cart:", error)
+    }
+  }
+
+  const handlePayment = async () => {
+    if (!scriptLoaded) {
+      setError("Payment gateway is still loading. Please try again.")
+      return
+    }
+
+    try {
+      setLoading(true)
+      setError(null)
+
+      const { data } = await axios.post("http://localhost:8080/api/create-razorpay-order", {
+        amount: cartData.reduce((sum, item) => sum + item.product.price * item.quantity, 0) * 100,
+        currency: "INR",
+        receipt: `order_${Date.now()}`,
+      })
+
+    const options = {
+      key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_QxyrmX1GnoDsRg",
+      amount: data.amount,
+      currency: data.currency,
+      name: "ShopEase",
+      order_id: data.id,
+      handler: async (response) => {
+        try {
+          await axios.post("http://localhost:8080/api/verify-payment", {
+            razorpayOrderId: response.razorpay_order_id,
+            razorpayPaymentId: response.razorpay_payment_id,
+            razorpaySignature: response.razorpay_signature,
+          })
+
+          // After successful payment verification, clear the cart
+          await clearCart()
+
+          alert("Payment Successful!")
+          setPaymentSuccess(true)
+          setLoading(false)
+        } catch {
+          alert("Payment verification failed!")
+          setLoading(false)
+        }
+      },
+    }
+
+    const razorpay = new window.Razorpay(options)
+    razorpay.open()
+  } catch (error) {
+    setError("Payment failed. Try again.")
+    setLoading(false)
+  }
+}
+
+const EmptyCart = () => (
+  <div className="container">
+    <div className="row">
+      <div className="col-md-12 py-5 bg-light text-center">
+        <h4 className="p-3 display-5">No items in Cart</h4>
+        <Link to="/" className="btn btn-outline-dark mx-4">
+          <i className="fa fa-arrow-left"></i> Continue Shopping
+        </Link>
+      </div>
+    </div>
+  </div>
+)
+
+const ShowCheckout = () => {
+  const subtotal = cartData.reduce((sum, item) => sum + item.product.price * item.quantity, 0)
+  const shipping = 30.0
+  const totalItems = cartData.reduce((sum, item) => sum + item.quantity, 0)
+
+  // If payment is successful, show success message and back to products link
+  if (paymentSuccess) {
     return (
-      <div className="container">
-        <div className="row">
-          <div className="col-md-12 py-5 bg-light text-center">
-            <h4 className="p-3 display-5">No item in Cart</h4>
-            <Link to="/" className="btn btn-outline-dark mx-4">
-              <i className="fa fa-arrow-left"></i> Continue Shopping
-            </Link>
+      <div className="container py-5">
+        <div className="row my-4">
+          <div className="col-md-12 text-center">
+            <div className="card p-5">
+              <div className="card-body">
+                <i className="fa fa-check-circle text-success" style={{ fontSize: "5rem" }}></i>
+                <h2 className="my-4 text-success">Payment Successful!</h2>
+                <p className="mb-4">Thank you for your purchase. Your order has been processed successfully.</p>
+                <Link to="/" className="btn btn-primary">
+                  <i className="fa fa-arrow-left me-2"></i>Back to Products
+                </Link>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-    )
-  }
-
-  const ShowCheckout = () => {
-    let subtotal = cartData.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-    let shipping = 30.0;
-    let totalItems = cartData.reduce((sum, item) => sum + item.quantity, 0);
-
-    // Verify payment with the server
-    const verifyPayment = async (response) => {
-      try {
-        const verificationData = {
-          razorpayOrderId: response.razorpay_order_id,
-          razorpayPaymentId: response.razorpay_payment_id,
-          razorpaySignature: response.razorpay_signature,
-        }
-
-        const verificationResponse = await axios.post("http://localhost:8080/api/verify-payment", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(verificationData),
-        })
-
-        const verificationResult = await verificationResponse.json()
-
-        if (verificationResult.status === "success") {
-          setPaymentSuccess(true)
-          // Here you would typically redirect to a success page or clear the cart
-        } else {
-          setError("Payment verification failed. Please try again.")
-        }
-      } catch (err) {
-        console.error("Error verifying payment:", err)
-        setError("Error verifying payment. Please contact support.")
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    // Handling Razorpay Payment
-    const handlePayment = async () => {
-      if (!scriptLoaded) {
-        setError("Payment gateway is still loading. Please try again in a moment.")
-        return
-      }
-
-      try {
-        setLoading(true)
-        setError(null)
-
-        // Call the server to create a Razorpay order
-        const response = await axios.post("http://localhost:8080/api/create-razorpay-order", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            amount: Math.round(subtotal + shipping),
-            currency: "INR",
-          }),
-        })
-
-        if (!response.ok) {
-          throw new Error("Failed to create order")
-        }
-
-        const data = await response.json()
-        const orderData = JSON.parse(data.orderData)
-
-        // Get Razorpay key from environment or use fallback
-        const razorpayKeyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_YOUR_TEST_KEY"
-
-        // Initialize Razorpay
-        const options = {
-          key: razorpayKeyId,
-          amount: orderData.amount,
-          currency: orderData.currency,
-          name: "Your Store Name",
-          description: "Order Payment",
-          image: "https://your-store-logo-url", // Your logo URL here
-          order_id: orderData.id,
-          handler: (response) => {
-            verifyPayment(response)
-          },
-          prefill: {
-            name: "John Doe", // Add dynamic values for the user here
-            email: "johndoe@example.com",
-            contact: "+919876543210",
-          },
-          notes: {
-            address: "Razorpay Address",
-            is_test: "true",
-          },
-          theme: {
-            color: "#F37254",
-          },
-          // Enable this for test mode
-          modal: {
-            ondismiss: () => {
-              setLoading(false)
-              console.log("Payment modal closed")
-            },
-          },
-          // For testing failed payments
-          config: {
-            display: {
-              blocks: {
-                utib: {
-                  // Axis Bank Test Cards
-                  name: "Test Payment Methods",
-                  instruments: [
-                    {
-                      method: "card",
-                      issuers: ["UTIB"],
-                    },
-                  ],
-                },
-              },
-              sequence: ["block.utib"],
-              preferences: {
-                show_default_blocks: false,
-              },
-            },
-          },
-        }
-
-        const razorpay = new window.Razorpay(options)
-
-        // For testing, you can use these test card details:
-        // Card Number: 4111 1111 1111 1111
-        // Expiry: Any future date
-        // CVV: Any 3 digits
-        // Name: Any name
-
-        razorpay.on("payment.failed", (response) => {
-          setLoading(false)
-          setError(`Payment failed: ${response.error.description}`)
-        })
-
-        razorpay.open()
-      } catch (error) {
-        console.error("Error creating Razorpay order:", error)
-        setError("Failed to initialize payment. Please try again.")
-        setLoading(false)
-      }
-    }
-
-    return (
-      <>
-        <div className="container py-5">
-          {paymentSuccess && (
-            <div className="alert alert-success" role="alert">
-              Payment successful! Thank you for your order.
-            </div>
-          )}
-
-          {error && (
-            <div className="alert alert-danger" role="alert">
-              {error}
-            </div>
-          )}
-
-          <div className="row my-4">
-            <div className="col-md-5 col-lg-4 order-md-last">
-              <div className="card mb-4">
-                <div className="card-header py-3 bg-light">
-                  <h5 className="mb-0">Order Summary</h5>
-                </div>
-                <div className="card-body">
-                  <ul className="list-group list-group-flush">
-                    <li className="list-group-item d-flex justify-content-between align-items-center border-0 px-0 pb-0">
-                      Products ({totalItems})<span>{'\u20B9'}{Math.round(subtotal)}</span>
-                    </li>
-                    <li className="list-group-item d-flex justify-content-between align-items-center px-0">
-                      Shipping
-                      <span>{'\u20B9'}{shipping}</span>
-                    </li>
-                    <li className="list-group-item d-flex justify-content-between align-items-center border-0 px-0 mb-3">
-                      <div>
-                        <strong>Total amount</strong>
-                      </div>
-                      <span>
-                        <strong>{'\u20B9'}{Math.round(subtotal + shipping)}</strong>
-                      </span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-            <div className="col-md-7 col-lg-8">
-              <div className="card mb-4">
-                <div className="card-header py-3">
-                  <h4 className="mb-0">Billing address</h4>
-                </div>
-                <div className="card-body">
-                  <form className="needs-validation" noValidate>
-                    {/* Your billing address fields here */}
-                    <hr className="my-4" />
-                    <h4 className="mb-3">Payment</h4>
-
-                    <button
-                      className="w-100 btn btn-primary"
-                      type="button"
-                      onClick={handlePayment}
-                      disabled={loading || !scriptLoaded}
-                    >
-                      {loading ? (
-                        <>
-                          <span
-                            className="spinner-border spinner-border-sm me-2"
-                            role="status"
-                            aria-hidden="true"
-                          ></span>
-                          Processing...
-                        </>
-                      ) : !scriptLoaded ? (
-                        "Loading payment gateway..."
-                      ) : (
-                        "Continue to checkout"
-                      )}
-                    </button>
-                  </form>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </>
     )
   }
 
   return (
-    <>
-      <Navbar />
-      <div className="container my-3 py-3">
-        <h1 className="text-center">Checkout</h1>
-        <hr />
-        {state.length ? <ShowCheckout /> : <EmptyCart />}
+    <div className="container py-5">
+      {error && (
+        <div className="alert alert-danger" role="alert">
+          {error}
+        </div>
+      )}
+
+      <div className="row my-4">
+        <div className="col-md-5 col-lg-4 order-md-last">
+          <div className="card mb-4">
+            <div className="card-header py-3 bg-light">
+              <h5 className="mb-0">Order Summary</h5>
+            </div>
+            <div className="card-body">
+              <ul className="list-group list-group-flush">
+                <li className="list-group-item d-flex justify-content-between align-items-center border-0 px-0 pb-0">
+                  Products ({totalItems}){" "}
+                  <span>
+                    {"\u20B9"}
+                    {Math.round(subtotal)}
+                  </span>
+                </li>
+                <li className="list-group-item d-flex justify-content-between align-items-center px-0">
+                  Shipping{" "}
+                  <span>
+                    {"\u20B9"}
+                    {shipping}
+                  </span>
+                </li>
+                <li className="list-group-item d-flex justify-content-between align-items-center border-0 px-0 mb-3">
+                  <div>
+                    <strong>Total amount</strong>
+                  </div>
+                  <span>
+                    <strong>
+                      {"\u20B9"}
+                      {Math.round(subtotal + shipping)}
+                    </strong>
+                  </span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div className="col-md-7 col-lg-8">
+          <div className="card mb-4">
+            <div className="card-header py-3">
+              <h4 className="mb-0">Billing Information</h4>
+            </div>
+            <div className="card-body">
+              <form className="needs-validation" noValidate>
+                <h4 className="mb-3">Payment</h4>
+                <button
+                  className="w-100 btn btn-primary"
+                  type="button"
+                  onClick={handlePayment}
+                  disabled={loading || !scriptLoaded}
+                >
+                  {loading ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Processing...
+                    </>
+                  ) : !scriptLoaded ? (
+                    "Loading payment gateway..."
+                  ) : (
+                    "Proceed to Payment"
+                  )}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
       </div>
-      <Footer />
-    </>
+    </div>
   )
 }
 
-export default Checkout
+return (
+  <>
+    <Navbar />
+    <div className="container my-3 py-3">
+      <h1 className="text-center">Checkout</h1>
+      <hr />
+      {cartData.length > 0 ? <ShowCheckout /> : <EmptyCart />}
+    </div>
+    <Footer />
+  </>
+)
+}
 
+export default Checkout
