@@ -22,7 +22,7 @@ const Product = () => {
 
   const addProduct = async (product) => {
     try {
-      const response = await axios.post("http://localhost:8080/cart/add", null, {
+      const response = await axios.post("http://15.206.163.163:8080/cart/add", null, {
         params: {
           userEmail: user.email,
           productId: product.id,
@@ -39,12 +39,12 @@ const Product = () => {
     const getProduct = async () => {
       setLoading(true);
       setLoading2(true);
-      const response = await fetch(`http://localhost:8080/product/getproductbyid/${id}`);
+      const response = await fetch(`http://15.206.163.163:8080/product/getproductbyid/${id}`);
       const data = await response.json();
       setProduct(data);
       setLoading(false);
       const response2 = await fetch(
-        `http://localhost:8080/product/getproductbycategory/${data.category}`
+        `http://15.206.163.163:8080/product/getproductbycategory/${data.category}`
       );
       const data2 = await response2.json();
       setSimilarProducts(data2);

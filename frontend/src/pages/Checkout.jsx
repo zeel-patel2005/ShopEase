@@ -24,7 +24,7 @@ const Checkout = () => {
     } else if (cartData.length === 0 && user?.email && isAuthenticated) {
       const fetchCartItems = async () => {
         try {
-          const response = await axios.get("http://localhost:8080/cart/allcartitem", {
+          const response = await axios.get("http://15.206.163.163:8080/cart/allcartitem", {
             params: { email: user.email },
           })
           setCartData(response.data)
@@ -49,7 +49,7 @@ const Checkout = () => {
     try {
       if (user?.email && isAuthenticated) {
         // Clear cart in the database
-        await axios.delete("http://localhost:8080/cart/clearcart", {
+        await axios.delete("http://15.206.163.163:8080/cart/clearcart", {
           params: { email: user.email },
         })
       }
@@ -75,7 +75,7 @@ const Checkout = () => {
       setLoading(true)
       setError(null)
 
-      const { data } = await axios.post("http://localhost:8080/api/create-razorpay-order", {
+      const { data } = await axios.post("http://15.206.163.163:8080/api/create-razorpay-order", {
         amount: cartData.reduce((sum, item) => sum + item.product.price * item.quantity, 0) * 100,
         currency: "INR",
         receipt: `order_${Date.now()}`,
@@ -89,7 +89,7 @@ const Checkout = () => {
       order_id: data.id,
       handler: async (response) => {
         try {
-          await axios.post("http://localhost:8080/api/verify-payment", {
+          await axios.post("http://15.206.163.163:8080/api/verify-payment", {
             razorpayOrderId: response.razorpay_order_id,
             razorpayPaymentId: response.razorpay_payment_id,
             razorpaySignature: response.razorpay_signature,

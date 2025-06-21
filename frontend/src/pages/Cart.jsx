@@ -15,7 +15,7 @@ const Cart = () => {
     const fetchCartItems = async () => {
       if (user.email && isAuthenticated) {
         try {
-          const response = await axios.get(`http://localhost:8080/cart/allcartitem`, {
+          const response = await axios.get(`http://15.206.163.163:8080/cart/allcartitem`, {
             params: { email: user.email }, // Query parameter
           });
           setCartData(response.data);
@@ -32,7 +32,7 @@ const Cart = () => {
 
   const addItem = async (item) => {
     try {
-      const response = await axios.post("http://localhost:8080/product/plus", {
+      const response = await axios.post("http://15.206.163.163:8080/product/plus", {
         email: user.email,
         productId: item.product.id, // Send product ID
       });
@@ -51,7 +51,7 @@ const Cart = () => {
 
   const removeItem = async (item) => {
     try {
-      const response = await axios.post("http://localhost:8080/product/remove", {
+      const response = await axios.post("http://15.206.163.163:8080/product/remove", {
         email: user.email,
         productId: item.product.id,
       });

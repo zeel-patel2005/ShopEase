@@ -13,7 +13,7 @@ const Navbar = () => {
         const fetchCartCount = async () => {
             if (user?.email) {  // ✅ Safe check
                 try {
-                    const response = await axios.get(`http://localhost:8080/cart/noofproduct/${user.email}`);
+                    const response = await axios.get(`http://15.206.163.163:8080/cart/noofproduct/${user.email}`);
                     console.log("Cart count response:", response.data); // Debugging log
                     setCartCount(response.data); // ✅ Properly update state
                 } catch (error) {

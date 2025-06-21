@@ -19,7 +19,7 @@ const Products = () => {
 
   const addProduct = async (product) => {
     try {
-      const response = await axios.post("http://localhost:8080/cart/add", null, {
+      const response = await axios.post("http://15.206.163.163:8080/cart/add", null, {
         params: {
           userEmail: user.email,
           productId: product.id,
@@ -38,7 +38,7 @@ const Products = () => {
     const getProducts = async () => {
       try {
         setLoading(true);
-        const response = await axios.get("http://localhost:8080/product/getallproduct");
+        const response = await axios.get("http://15.206.163.163:8080/product/getallproduct");
 
         if (isMounted) {
           setData(response.data); // Axios stores response in `response.data`
